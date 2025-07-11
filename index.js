@@ -1,7 +1,7 @@
 // pages/api/[...path].js
 export default async function handler(req, res) {
   const { path } = req.query;
-  const apiUrl = `https://api.sofascore.com/api/v1/${path.join('/')}`; // Ganti dengan URL API Anda
+  const apiUrl = `https://api.sofascore.com/api/v1/${path.join('/')}`;
 
   try {
     const response = await fetch(apiUrl);
