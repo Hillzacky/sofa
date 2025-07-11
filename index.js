@@ -1,56 +1,40 @@
-const http = require('http');
-const https = require('https');
-const url = require('url');
+const express = require('express');
+const fetch = require('node-fetch');
 
-const server = http.createServer(async (req, res) => {
+const app = express();
+const port = 10000; // Atau port lainnya
+
+app.use(express.json());
+
+app.all('*', async (req, res) => {
+  const apiUrl = `https://api.sofascore.com/api/v1${req.originalUrl}`; // Menggabungkan URL API dengan path dari request
+
   try {
-    // Mendapatkan URL API dan path
-    const parsedUrl = url.parse(req.url, true);
-    const apiUrl = `https://api.sofascore.com/api/v1${parsedUrl.path}`; // Ganti dengan URL API Anda
-
-    // Membuat request ke API eksternal
-    const apiRequest = https.request(apiUrl, {
+    const apiResponse = await fetch(apiUrl, {
       method: req.method,
-      headers: req.headers,
-    }, (apiResponse) => {
-      let data = '';
-
-      apiResponse.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      apiResponse.on('end', () => {
-        res.writeHead(apiResponse.statusCode, apiResponse.headers);
-        res.end(data);
-      });
+      headers: {
+        ...req.headers, // Menyalin headers dari request asli
+        // Tambahkan headers lainnya jika diperlukan (misalnya, Authorization)
+      },
+      body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined, // Menambahkan body request jika bukan GET
     });
 
-    // Menangani error
-    apiRequest.on('error', (error) => {
-      console.error('Error forwarding request:', error);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Failed to forward request' }));
-    });
+    if (!apiResponse.ok) {
+      // Handle error dari API eksternal
+      const errorData = await apiResponse.json().catch(() => ({ error: 'API error' }));
+      return res.status(apiResponse.status).json(errorData);
+    }
 
-    // Menulis data request ke API eksternal
-    req.on('data', (chunk) => {
-      apiRequest.write(chunk);
-    });
-
-    req.on('end', () => {
-      apiRequest.end();
-    });
-
+    const data = await apiResponse.json();
+    res.json(data);
   } catch (error) {
-    console.error('Error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal Server Error' }));
+    console.error('Error fetching data:', error);
+    res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
 
 
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
+app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
 
